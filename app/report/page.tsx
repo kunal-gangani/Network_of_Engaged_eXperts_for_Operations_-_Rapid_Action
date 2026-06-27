@@ -13,12 +13,12 @@ import {
 type Step = 'photo' | 'details' | 'location' | 'review'
 
 const CATEGORY_OPTIONS: { value: IssueCategory; label: string }[] = [
-  { value: 'pothole',       label: 'Pothole' },
+  { value: 'pothole', label: 'Pothole' },
   { value: 'water_leakage', label: 'Water Leakage' },
-  { value: 'streetlight',   label: 'Streetlight' },
-  { value: 'garbage',       label: 'Garbage' },
+  { value: 'streetlight', label: 'Streetlight' },
+  { value: 'garbage', label: 'Garbage' },
   { value: 'stray_animals', label: 'Stray Animals' },
-  { value: 'other',         label: 'Other' },
+  { value: 'other', label: 'Other' },
 ]
 
 export default function ReportPage() {

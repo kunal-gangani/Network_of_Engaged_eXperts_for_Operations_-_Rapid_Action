@@ -28,10 +28,10 @@ export default async function DashboardPage() {
     vote_count: i.vote_count?.[0]?.count ?? 0,
   }))
 
-  const total     = issues.length
-  const resolved  = issues.filter(i => i.status === 'resolved').length
-  const critical  = issues.filter(i => (i.decay_score ?? 0) >= 80).length
-  const rtiCount  = issues.filter(i => {
+  const total = issues.length
+  const resolved = issues.filter(i => i.status === 'resolved').length
+  const critical = issues.filter(i => (i.decay_score ?? 0) >= 80).length
+  const rtiCount = issues.filter(i => {
     const days = Math.floor((Date.now() - new Date(i.created_at).getTime()) / 86400000)
     return days >= 14 && i.status !== 'resolved'
   }).length
@@ -44,9 +44,9 @@ export default async function DashboardPage() {
   }, {} as Record<string, number>)
 
   const decayBuckets = {
-    low:    issues.filter(i => (i.decay_score ?? 0) < 40).length,
+    low: issues.filter(i => (i.decay_score ?? 0) < 40).length,
     medium: issues.filter(i => (i.decay_score ?? 0) >= 40 && (i.decay_score ?? 0) < 80).length,
-    high:   issues.filter(i => (i.decay_score ?? 0) >= 80).length,
+    high: issues.filter(i => (i.decay_score ?? 0) >= 80).length,
   }
 
   const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0
@@ -304,11 +304,11 @@ export default async function DashboardPage() {
           Active agents
         </span>
         {[
-          { label: 'Vision Analyzer',    color: '#E8621A', num: '1' },
+          { label: 'Vision Analyzer', color: '#E8621A', num: '1' },
           { label: 'Duplicate Detector', color: '#8B5CF6', num: '2' },
-          { label: 'Decay & Risk',       color: '#F5A623', num: '3' },
+          { label: 'Decay & Risk', color: '#F5A623', num: '3' },
           { label: 'Resolution Planner', color: '#2ECC71', num: '4' },
-          { label: 'RTI Escalation',     color: '#E74C3C', num: '5' },
+          { label: 'RTI Escalation', color: '#E74C3C', num: '5' },
         ].map((agent, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
             <div style={{
