@@ -1,33 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
-import { createClient } from '@/lib/supabase/server'
+import { GoogleGenAI } from '@google/genai'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, apiVersion: 'v1' })
 
-const SYSTEM_PROMPT = `You are NEXORA's Civic AI Agent — a helpful assistant for citizens in Ahmedabad, India who want to report civic issues like potholes, water leakages, broken streetlights, garbage, or stray animals.
+const SYSTEM_PROMPT = `You are NEXORA's Civic AI Agent for Ahmedabad, India. Help citizens report civic issues like potholes, water leakages, broken streetlights, garbage, or stray animals.
 
 Your job:
-1. Greet the user warmly and ask them to describe their issue
-2. Ask ONE clarifying question at a time if needed (location, how long it's been there, severity)
-3. Once you have enough info (issue type + rough location), output the form data
+1. Greet the user and ask them to describe their issue
+2. Ask ONE clarifying question at a time if needed (location, severity, how long)
+3. Once you have enough info, output the form data
 
 Rules:
-- Keep responses short and conversational (2-3 sentences max)
-- Be friendly and professional
+- Keep responses short and friendly (2-3 sentences max)
 - Ask about location if not mentioned
-- When you have enough info, end your message with exactly this block:
+- When ready, end your message with exactly this block:
 
 FORM_DATA:
-{
-  "title": "...",
-  "description": "...",
-  "category": "pothole|water_leakage|streetlight|garbage|stray_animals|other",
-  "severity": 1-5,
-  "suggested_authority": "Ahmedabad Municipal Corporation|PWD|Electricity Board|Water Board|Animal Control|Other"
-}
+{"title":"...","description":"...","category":"pothole|water_leakage|streetlight|garbage|stray_animals|other","severity":3,"suggested_authority":"Ahmedabad Municipal Corporation|PWD|Electricity Board|Water Board|Animal Control|Other"}
 
-Only output FORM_DATA when you're confident you have title, description, category, and severity.
-Never output FORM_DATA more than once.`
+Only output FORM_DATA once when you have title, description, category, severity.`
 
 interface Message {
     role: 'user' | 'model'
@@ -41,52 +32,28 @@ export async function POST(request: NextRequest) {
             message: string
         }
 
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+        const contents = [
+            { role: 'user', parts: [{ text: 'System instructions: ' + SYSTEM_PROMPT }] },
+            { role: 'model', parts: [{ text: 'Understood. I am the NEXORA Civic AI Agent, ready to help citizens of Ahmedabad report civic issues.' }] },
+            ...history,
+            { role: 'user', parts: [{ text: message }] },
+        ]
 
-        const chat = model.startChat({
-            history: [
-                { role: 'user', parts: [{ text: 'System instructions: ' + SYSTEM_PROMPT }] },
-                { role: 'model', parts: [{ text: 'Understood. I am the NEXORA Civic AI Agent.' }] },
-                ...history,
-            ],
-            generationConfig: { temperature: 0.4, maxOutputTokens: 400 },
+        const result = await ai.models.generateContent({
+            model: 'gemini-pro',
+            contents,
+            config: { temperature: 0.4, maxOutputTokens: 400 },
         })
 
-        const result = await chat.sendMessage(message)
-        const text = result.response.text()
-
-        // Check if FORM_DATA is in the response
+        const text = result.text ?? ''
         let formData = null
         const formMatch = text.match(/FORM_DATA:\s*(\{[\s\S]*?\})/m)
         if (formMatch) {
-            try {
-                formData = JSON.parse(formMatch[1])
-            } catch { }
+            try { formData = JSON.parse(formMatch[1]) } catch { }
         }
-
-        // Clean response text — remove FORM_DATA block from display
         const displayText = text.replace(/FORM_DATA:[\s\S]*$/m, '').trim()
 
-        // Check for duplicates if we have form data
-        let duplicate = null
-        if (formData) {
-            try {
-                const supabase = await createClient()
-                const { data: recent } = await supabase
-                    .from('issues')
-                    .select('id, title, status, created_at')
-                    .eq('category', formData.category)
-                    .neq('status', 'resolved')
-                    .order('created_at', { ascending: false })
-                    .limit(3)
-
-                if (recent && recent.length > 0) {
-                    duplicate = recent[0]
-                }
-            } catch { }
-        }
-
-        return NextResponse.json({ text: displayText, formData, duplicate })
+        return NextResponse.json({ text: displayText, formData, duplicate: null })
     } catch (err) {
         console.error('Agent error:', err)
         return NextResponse.json({ error: 'Agent failed' }, { status: 500 })

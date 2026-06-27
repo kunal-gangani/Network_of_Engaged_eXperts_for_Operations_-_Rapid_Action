@@ -1,29 +1,22 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { GeminiVisionResult } from '@/types'
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, apiVersion: 'v1' })
 
-const VISION_PROMPT = `You are a civic issue classifier for Indian cities. Analyze this image and return ONLY valid JSON with no markdown:
-{
-  "category": "pothole|water_leakage|streetlight|garbage|stray_animals|other",
-  "severity": 3,
-  "summary": "one-line description under 20 words",
-  "suggested_authority": "Ahmedabad Municipal Corporation|PWD|Electricity Board|Water Board|Animal Control|Other"
-}
-severity must be an integer 1-5.`
+const VISION_PROMPT = `You are a civic issue classifier for Indian cities. Analyze this image and return ONLY valid JSON with no markdown, no code blocks, no extra text whatsoever:
+{"category":"pothole","severity":3,"summary":"one-line description under 20 words","suggested_authority":"Ahmedabad Municipal Corporation"}
+category must be one of: pothole, water_leakage, streetlight, garbage, stray_animals, other
+severity must be integer 1-5
+suggested_authority must be one of: Ahmedabad Municipal Corporation, PWD, Electricity Board, Water Board, Animal Control, Other`
 
 export async function categorizeIssueImage(
   imageBase64: string,
   mimeType: string
 ): Promise<GeminiVisionResult> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.1 },
-  })
-
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      const result = await model.generateContent({
+      const result = await ai.models.generateContent({
+        model: 'gemini-pro-vision',
         contents: [{
           role: 'user',
           parts: [
@@ -32,7 +25,11 @@ export async function categorizeIssueImage(
           ],
         }],
       })
-      const parsed = JSON.parse(result.response.text()) as GeminiVisionResult
+
+      const text = (result.text ?? '').trim()
+      // Strip any markdown code blocks if present
+      const clean = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const parsed = JSON.parse(clean) as GeminiVisionResult
       return {
         category: parsed.category ?? 'other',
         severity: Math.min(5, Math.max(1, Number(parsed.severity) || 3)),
@@ -47,10 +44,7 @@ export async function categorizeIssueImage(
       throw err
     }
   }
-
   return { category: 'other', severity: 3, summary: 'Could not analyze — fill in manually', suggested_authority: 'Ahmedabad Municipal Corporation' }
 }
 
-export function getModel(name = 'gemini-1.5-flash') {
-  return genAI.getGenerativeModel({ model: name })
-}
+export { ai }
