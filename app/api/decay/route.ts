@@ -55,7 +55,7 @@ Return ONLY valid JSON:
     })
 
     const parsed = JSON.parse(result.response.text())
-    const score  = Math.min(100, Math.max(0, Number(parsed.score) || 0))
+    const score = Math.min(100, Math.max(0, Number(parsed.score) || 0))
     const reason = parsed.reason ?? 'Issue requires attention'
 
     await supabase

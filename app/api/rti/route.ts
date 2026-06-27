@@ -22,9 +22,9 @@ export async function POST(request: NextRequest) {
       .select('count')
       .eq('issue_id', issue_id)
 
-    const daysOld   = Math.floor((Date.now() - new Date(issue.created_at).getTime()) / 86400000)
+    const daysOld = Math.floor((Date.now() - new Date(issue.created_at).getTime()) / 86400000)
     const voteCount = votes?.[0]?.count ?? 0
-    const today     = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
 
     const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 
@@ -56,7 +56,7 @@ Write a complete, formal RTI letter:
 Format as a proper formal letter. Use Indian RTI Act language.`
 
     const result = await model.generateContent(prompt)
-    const draft  = result.response.text()
+    const draft = result.response.text()
 
     return NextResponse.json({ draft })
   } catch (err) {
