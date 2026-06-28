@@ -25,15 +25,12 @@ const CAT_LABELS: Record<string, string> = {
   other:         'Other',
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null
   return (
-    <div style={{
-      background: '#252525', border: '1px solid #2E2E2E',
-      borderRadius: '6px', padding: '6px 10px', fontSize: '11px', color: '#fff',
-    }}>
-      <p style={{ margin: 0, color: '#888', fontSize: '9px', marginBottom: '2px' }}>{label}</p>
-      <p style={{ margin: 0, fontWeight: 600 }}>{payload[0].value} issues</p>
+    <div className="bg-[#252525] border border-[#2E2E2E] rounded-md px-2.5 py-1.5 text-[11px] text-white">
+      <p className="text-[9px] text-[#888] mb-0.5">{label}</p>
+      <p className="font-semibold m-0">{payload[0].value} issues</p>
     </div>
   )
 }
@@ -45,16 +42,16 @@ export default function DashboardCharts({ type, data }: Props) {
       .sort((a, b) => b.value - a.value)
 
     if (chartData.length === 0) {
-      return <div style={{ padding: '32px 20px', textAlign: 'center', fontSize: '11px', color: '#555' }}>No data yet</div>
+      return <div className="py-8 text-center text-[11px] text-[#555]">No data yet</div>
     }
 
     return (
-      <div style={{ padding: '16px 20px 12px' }}>
+      <div className="px-5 py-4">
         <ResponsiveContainer width="100%" height={120}>
           <BarChart data={chartData} barSize={28} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
             <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#555' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 9, fill: '#555' }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#FFFFFF08' }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: '#FFFFFF08' }} />
             <Bar dataKey="value" radius={[3, 3, 0, 0]}>
               {chartData.map((entry, i) => <Cell key={i} fill={entry.color} fillOpacity={0.85} />)}
             </Bar>
@@ -73,23 +70,23 @@ export default function DashboardCharts({ type, data }: Props) {
     const total = chartData.reduce((s, d) => s + d.value, 0)
 
     return (
-      <div style={{ padding: '16px 20px 12px' }}>
+      <div className="px-5 py-4">
         <ResponsiveContainer width="100%" height={90}>
           <BarChart data={chartData} barSize={48} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
             <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#555' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 9, fill: '#555' }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: '#FFFFFF08' }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: '#FFFFFF08' }} />
             <Bar dataKey="value" radius={[3, 3, 0, 0]}>
               {chartData.map((entry, i) => <Cell key={i} fill={entry.color} fillOpacity={0.85} />)}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
 
-        <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
+        <div className="flex gap-4 mt-2 flex-wrap">
           {chartData.map((d, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: d.color, flexShrink: 0 }} />
-              <span style={{ fontSize: '9px', color: '#555' }}>
+            <div key={i} className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: d.color }} />
+              <span className="text-[9px] text-[#555]">
                 {d.name.split(' ')[0]} — {total > 0 ? Math.round((d.value / total) * 100) : 0}%
               </span>
             </div>

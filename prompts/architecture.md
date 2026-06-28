@@ -1,12 +1,8 @@
-Phase 2 is approved. Continue with Phase 3 (Dashboard), but optimize for the hackathon evaluation criteria rather than a generic admin dashboard. Build a premium AI Command Center using Tailwind CSS only. The dashboard should immediately communicate that NEXORA is an AI-powered civic intelligence platform. Prioritize the following sections in this order:
+The Dashboard Enhancement Phase does not appear in the UI. I still only see the Phase 3 dashboard. Please implement and integrate the following components into app/dashboard/page.tsx:
 
-Hero overview with today's AI briefing.
-Four KPI cards (Open Issues, Critical Issues, Resolution Rate, AI Confidence).
-Gemini Area Assessment.
-AI Severity Heatmap.
-Highest Decay Score panel.
-Multi-Agent Pipeline visualization showing each AI agent and its output.
-Recent high-priority issues.
-Recent activity timeline.
+AIDailyBriefing
+AISeverityHeatmap
+AIAgentStatus
+ImpactSimulator
 
-Use realistic mock civic data, responsive layouts, subtle animations, and maintain the dark (#141414) and orange (#E8621A) design language. Avoid inline styles and keep all new components reusable.
+Ensure they are imported and rendered on the Dashboard, not just created as standalone components. Verify they are visible in the browser before marking the task complete. Do not continue to another phase until these sections are fully integrated and working.

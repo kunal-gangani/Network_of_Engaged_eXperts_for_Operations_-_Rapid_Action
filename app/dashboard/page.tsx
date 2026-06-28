@@ -1,9 +1,17 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Issue } from '@/types'
-import { CategoryBadge, StatusBadge, DecayBadge } from '@/components/IssueBadges'
-import DashboardCharts from '@/components/DashboardCharts'
-import { AlertTriangle, CheckCircle2, FileWarning, Zap, ArrowRight, Plus } from 'lucide-react'
+import { CategoryBadge, StatusBadge, DecayBadge } from '@/components/issues/IssueBadges'
+import DashboardCharts from '@/components/dashboard/DashboardCharts'
+import AIDailyBriefing from '@/components/dashboard/AIDailyBriefing'
+import AIAgentStatus from '@/components/dashboard/AIAgentStatus'
+import AISeverityHeatmap from '@/components/dashboard/AISeverityHeatmap'
+import PredictiveSimulator from '@/components/dashboard/PredictiveSimulator'
+import ExplainableDecay from '@/components/dashboard/ExplainableDecay'
+import {
+  AlertTriangle, CheckCircle2, Zap,
+  ArrowRight, Plus, Bot,
+} from 'lucide-react'
 
 export const revalidate = 0
 
@@ -14,6 +22,27 @@ function timeAgo(dateStr: string) {
   if (days === 1) return 'Yesterday'
   return `${days}d ago`
 }
+
+function todayStr() {
+  return new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+const CAT_META: Record<string, { label: string; color: string; icon: string }> = {
+  pothole:       { label: 'Pothole',       color: '#E8621A', icon: '🕳️' },
+  water_leakage: { label: 'Water Leakage', color: '#3B82F6', icon: '💧' },
+  streetlight:   { label: 'Streetlight',   color: '#F5A623', icon: '💡' },
+  garbage:       { label: 'Garbage',       color: '#E74C3C', icon: '🗑️' },
+  stray_animals: { label: 'Stray Animals', color: '#8B5CF6', icon: '🐕' },
+  other:         { label: 'Other',         color: '#555555', icon: '📌' },
+}
+
+const AGENTS = [
+  { num: '01', label: 'Vision Analyzer',    color: '#E8621A', desc: 'Photo → category, severity' },
+  { num: '02', label: 'Duplicate Detector', color: '#8B5CF6', desc: 'pgvector similarity search' },
+  { num: '03', label: 'Decay & Risk',       color: '#F5A623', desc: '0–100 urgency scoring' },
+  { num: '04', label: 'Resolution Planner', color: '#2ECC71', desc: '5-step action plan' },
+  { num: '05', label: 'RTI Escalation',     color: '#E74C3C', desc: 'Legal notice generation' },
+]
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -28,15 +57,18 @@ export default async function DashboardPage() {
     vote_count: i.vote_count?.[0]?.count ?? 0,
   }))
 
-  const total = issues.length
-  const resolved = issues.filter(i => i.status === 'resolved').length
-  const critical = issues.filter(i => (i.decay_score ?? 0) >= 80).length
-  const rtiCount = issues.filter(i => {
+  const total      = issues.length
+  const open       = issues.filter(i => i.status !== 'resolved').length
+  const resolved   = issues.filter(i => i.status === 'resolved').length
+  const critical   = issues.filter(i => (i.decay_score ?? 0) >= 80).length
+  const rtiCount   = issues.filter(i => {
     const days = Math.floor((Date.now() - new Date(i.created_at).getTime()) / 86400000)
     return days >= 14 && i.status !== 'resolved'
   }).length
-
-  const topIssues = issues.slice(0, 6)
+  const withDecay  = issues.filter(i => i.decay_score !== null).length
+  const resolutionRate  = total > 0 ? Math.round((resolved / total) * 100) : 0
+  const aiConfidence    = total > 0 ? Math.round((withDecay / total) * 100) : 0
+  const thisWeek        = issues.filter(i => Date.now() - new Date(i.created_at).getTime() < 7 * 86400000).length
 
   const catCounts = issues.reduce((acc, i) => {
     acc[i.category] = (acc[i.category] ?? 0) + 1
@@ -44,314 +76,385 @@ export default async function DashboardPage() {
   }, {} as Record<string, number>)
 
   const decayBuckets = {
-    low: issues.filter(i => (i.decay_score ?? 0) < 40).length,
+    low:    issues.filter(i => (i.decay_score ?? 0) < 40).length,
     medium: issues.filter(i => (i.decay_score ?? 0) >= 40 && (i.decay_score ?? 0) < 80).length,
-    high: issues.filter(i => (i.decay_score ?? 0) >= 80).length,
+    high:   issues.filter(i => (i.decay_score ?? 0) >= 80).length,
   }
 
-  const resolutionRate = total > 0 ? Math.round((resolved / total) * 100) : 0
+  const topDecay   = issues.filter(i => i.decay_score !== null).slice(0, 3)
+  const topIssues  = issues.slice(0, 6)
+
+  // Recent activity: last 5 issues sorted by created_at desc
+  const recentActivity = [...issues]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5)
 
   return (
-    <div>
+    <div className="divide-y divide-[#2E2E2E]">
 
-      {/* Hero */}
-      <div style={{
-        borderBottom: '1px solid #2E2E2E',
-        padding: '32px 0 28px',
-        position: 'relative',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          position: 'absolute', right: '-10px', top: '50%',
-          transform: 'translateY(-50%)',
-          fontSize: '140px', fontWeight: 700,
-          color: '#E8621A', opacity: '0.04',
-          letterSpacing: '-4px', pointerEvents: 'none',
-          userSelect: 'none',
-        }}>
+      {/* ── 1. Hero / AI Briefing ───────────────────────────── */}
+      <div className="relative overflow-hidden py-8">
+        {/* Background watermark */}
+        <span className="absolute right-0 top-1/2 -translate-y-1/2 text-[120px] sm:text-[160px] font-bold text-[#E8621A] opacity-[0.03] pointer-events-none select-none leading-none tracking-tighter">
           NEXORA
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-          <div style={{ width: '24px', height: '1px', background: '#E8621A' }} />
-          <span style={{ fontSize: '10px', color: '#E8621A', letterSpacing: '2px', fontWeight: 500 }}>
-            LIVE CIVIC OVERVIEW
+        </span>
+
+        <div className="flex items-center gap-2 mb-3">
+          <div className="w-6 h-px bg-[#E8621A]" />
+          <span className="text-[10px] text-[#E8621A] tracking-[2px] font-medium uppercase">AI Command Center</span>
+          {/* Live pulse */}
+          <span className="flex items-center gap-1.5 ml-auto">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#2ECC71] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#2ECC71]" />
+            </span>
+            <span className="text-[10px] text-[#2ECC71]">5 agents live</span>
           </span>
         </div>
-        <h1 style={{
-          fontSize: '28px', fontWeight: 600,
-          color: '#fff', margin: '0 0 8px',
-          lineHeight: 1.2,
-        }}>
-          Civic Intelligence<br />Platform
+
+        <h1 className="text-2xl sm:text-3xl font-semibold text-white mb-2 leading-tight">
+          Civic Intelligence<br className="sm:hidden" /> Platform
         </h1>
-        <p style={{ fontSize: '12px', color: '#888', margin: 0, lineHeight: 1.7, maxWidth: '440px' }}>
-          AI-powered issue tracking, autonomous risk scoring, and resolution planning
-          for urban communities — powered by 5 Gemini agents.
+        <p className="text-xs text-[#888] leading-relaxed max-w-md mb-4">
+          AI-powered issue tracking, autonomous risk scoring, and resolution planning — powered by 5 Gemini agents.
         </p>
+
+        {/* Briefing strip */}
+        <div className="inline-flex flex-wrap gap-3 text-[10px] text-[#555]">
+          <span>📅 {todayStr()}</span>
+          <span className="text-[#2E2E2E]">·</span>
+          <span>{thisWeek} issues this week</span>
+          <span className="text-[#2E2E2E]">·</span>
+          <span className="text-[#E8621A]">{critical} critical</span>
+          {rtiCount > 0 && <>
+            <span className="text-[#2E2E2E]">·</span>
+            <span className="text-[#8B5CF6]">{rtiCount} RTI eligible</span>
+          </>}
+        </div>
       </div>
 
-      {/* Stats strip */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(4, 1fr)',
-        borderBottom: '1px solid #2E2E2E',
-      }}>
+      {/* ── 2. AI Daily Briefing ───────────────────────────────── */}
+      <AIDailyBriefing critical={critical} rtiCount={rtiCount} />
+
+      {/* ── 3. KPI Cards ───────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 py-0">
         {[
           {
-            label: 'Total issues',
-            value: total,
-            sub: `${issues.filter(i => {
-              const d = Date.now() - new Date(i.created_at).getTime()
-              return d < 7 * 86400000
-            }).length} this week`,
+            label: 'Open Issues',
+            value: open,
+            sub: `${thisWeek} new this week`,
             accent: '#E8621A',
-            pct: Math.min(100, total),
-            icon: <AlertTriangle size={18} />,
+            pct: total > 0 ? Math.round((open / total) * 100) : 0,
+            icon: <AlertTriangle size={16} />,
           },
           {
-            label: 'Resolved',
-            value: resolved,
-            sub: `${resolutionRate}% resolution rate`,
-            accent: '#2ECC71',
-            pct: resolutionRate,
-            icon: <CheckCircle2 size={18} />,
-          },
-          {
-            label: 'Critical decay',
+            label: 'Critical Decay',
             value: critical,
-            sub: 'Score above 80',
+            sub: 'Score ≥ 80',
             accent: '#E74C3C',
             pct: total > 0 ? Math.round((critical / total) * 100) : 0,
-            icon: <Zap size={18} />,
+            icon: <Zap size={16} />,
           },
           {
-            label: 'RTI triggered',
-            value: rtiCount,
-            sub: '14+ days unresolved',
+            label: 'Resolution Rate',
+            value: `${resolutionRate}%`,
+            sub: `${resolved} of ${total} resolved`,
+            accent: '#2ECC71',
+            pct: resolutionRate,
+            icon: <CheckCircle2 size={16} />,
+          },
+          {
+            label: 'AI Coverage',
+            value: `${aiConfidence}%`,
+            sub: `${withDecay} issues scored`,
             accent: '#8B5CF6',
-            pct: total > 0 ? Math.round((rtiCount / total) * 100) : 0,
-            icon: <FileWarning size={18} />,
+            pct: aiConfidence,
+            icon: <Bot size={16} />,
           },
         ].map((stat, i) => (
-          <div key={i} style={{
-            padding: '20px 24px',
-            borderRight: i < 3 ? '1px solid #2E2E2E' : 'none',
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-              <span style={{ fontSize: '9px', color: '#888', letterSpacing: '1px', textTransform: 'uppercase' }}>
-                {stat.label}
-              </span>
-              <span style={{ color: stat.accent, opacity: 0.7 }}>{stat.icon}</span>
+          <div key={i} className="kpi-card p-5 border-b lg:border-b-0 border-r-0 sm:border-r border-[#2E2E2E] last:border-r-0">
+            <div className="flex justify-between items-start mb-3">
+              <span className="text-[9px] text-[#888] tracking-widest uppercase">{stat.label}</span>
+              <span style={{ color: stat.accent }} className="opacity-70">{stat.icon}</span>
             </div>
-            <div style={{ fontSize: '28px', fontWeight: 600, color: stat.accent, lineHeight: 1, marginBottom: '4px' }}>
+            <div className="text-3xl font-semibold mb-1 leading-none" style={{ color: stat.accent }}>
               {stat.value}
             </div>
-            <div style={{ fontSize: '10px', color: '#555', marginBottom: '10px' }}>{stat.sub}</div>
-            <div style={{ height: '2px', background: '#2E2E2E', borderRadius: '1px' }}>
-              <div style={{
-                height: '100%', borderRadius: '1px',
-                background: stat.accent,
-                width: `${stat.pct}%`,
-                transition: 'width 0.6s ease',
-              }} />
+            <div className="text-[10px] text-[#555] mb-3">{stat.sub}</div>
+            <div className="h-0.5 bg-[#2E2E2E] rounded-full">
+              <div className="h-full rounded-full transition-all duration-700" style={{ background: stat.accent, width: `${stat.pct}%` }} />
             </div>
           </div>
         ))}
       </div>
 
-      {/* Charts row */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        borderBottom: '1px solid #2E2E2E',
-      }}>
-        {/* Category chart */}
-        <div style={{ borderRight: '1px solid #2E2E2E' }}>
-          <div style={{
-            padding: '12px 20px',
-            borderBottom: '1px solid #2E2E2E',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontSize: '11px', fontWeight: 500, color: '#fff' }}>Issues by category</span>
-            <span style={{
-              fontSize: '9px', background: '#E8621A22',
-              color: '#E8621A', border: '1px solid #E8621A44',
-              padding: '2px 8px', borderRadius: '4px',
-            }}>✦ AI classified</span>
+      {/* ── 4. AI Agent Status ─────────────────────────────────── */}
+      <AIAgentStatus />
+
+      {/* ── 5. Gemini Area Assessment ──────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2E2E2E]">
+          <span className="text-[11px] font-medium text-white">Gemini Area Assessment</span>
+          <span className="text-[9px] bg-[#E8621A22] text-[#E8621A] border border-[#E8621A44] px-2 py-0.5 rounded">✦ AI classified</span>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-[#2E2E2E]">
+          {Object.entries(CAT_META).map(([key, meta]) => {
+            const count   = catCounts[key] ?? 0
+            const pct     = total > 0 ? Math.round((count / total) * 100) : 0
+            const maxCat  = Math.max(...Object.values(catCounts), 1)
+            const barPct  = Math.round((count / maxCat) * 100)
+            return (
+              <div key={key} className="p-4 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-base">{meta.icon}</span>
+                  <span className="text-[10px] text-[#888]">{meta.label}</span>
+                </div>
+                <div className="text-2xl font-bold text-white">{count}</div>
+                <div className="h-0.5 bg-[#2E2E2E] rounded-full">
+                  <div className="h-full rounded-full" style={{ background: meta.color, width: `${barPct}%` }} />
+                </div>
+                <span className="text-[9px]" style={{ color: meta.color }}>{pct}% of total</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── AI Severity Heatmap ─────────────────────────────────── */}
+      <AISeverityHeatmap />
+
+      {/* ── 4. Charts row (Heatmap + Decay distribution) ───────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2">
+        <div className="border-b md:border-b-0 md:border-r border-[#2E2E2E]">
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[#2E2E2E]">
+            <span className="text-[11px] font-medium text-white">Issues by category</span>
+            <span className="text-[9px] bg-[#E8621A22] text-[#E8621A] border border-[#E8621A44] px-2 py-0.5 rounded">✦ AI classified</span>
           </div>
           <DashboardCharts type="category" data={catCounts} />
         </div>
-
-        {/* Decay distribution */}
         <div>
-          <div style={{
-            padding: '12px 20px',
-            borderBottom: '1px solid #2E2E2E',
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}>
-            <span style={{ fontSize: '11px', fontWeight: 500, color: '#fff' }}>Decay risk distribution</span>
-            <span style={{
-              fontSize: '9px', background: '#E8621A22',
-              color: '#E8621A', border: '1px solid #E8621A44',
-              padding: '2px 8px', borderRadius: '4px',
-            }}>✦ Agent 3</span>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[#2E2E2E]">
+            <span className="text-[11px] font-medium text-white">Decay risk distribution</span>
+            <span className="text-[9px] bg-[#E8621A22] text-[#E8621A] border border-[#E8621A44] px-2 py-0.5 rounded">✦ Agent 03</span>
           </div>
           <DashboardCharts type="decay" data={decayBuckets} />
         </div>
       </div>
 
-      {/* Recent issues table */}
+      {/* ── 5. Highest Decay Score panel ──────────────────────── */}
+      {topDecay.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-[#2E2E2E]">
+            <span className="text-[11px] font-medium text-white">Highest decay scores</span>
+            <span className="text-[9px] bg-[#E74C3C22] text-[#E74C3C] border border-[#E74C3C44] px-2 py-0.5 rounded">✦ Agent 03 · critical</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#2E2E2E]">
+            {topDecay.map((issue, i) => {
+              const score = issue.decay_score ?? 0
+              const color = score >= 80 ? '#E74C3C' : score >= 60 ? '#F5A623' : '#2ECC71'
+              const deg   = Math.round(score * 3.6)
+              return (
+                <Link key={issue.id} href={`/issues/${issue.id}`} className="p-5 flex items-start gap-4 no-underline group hover:bg-[#1C1C1C] transition-colors">
+                  {/* Conic gauge */}
+                  <div className="shrink-0 w-14 h-14 rounded-full flex items-center justify-center"
+                    style={{ background: `conic-gradient(${color} ${deg}deg, #2E2E2E 0deg)` }}>
+                    <div className="w-10 h-10 rounded-full bg-[#141414] flex items-center justify-center">
+                      <span className="text-sm font-bold" style={{ color }}>{score}</span>
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-white mb-1 line-clamp-2 group-hover:text-[#E8621A] transition-colors">{issue.title}</p>
+                    <CategoryBadge category={issue.category} />
+                    <p className="text-[10px] text-[#555] mt-1">{timeAgo(issue.created_at)}</p>
+                    <div className="mt-2" onClick={e => e.preventDefault()}>
+                      <ExplainableDecay score={score} issueTitle={issue.title} />
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Predictive Impact Simulator ─────────────────────────── */}
+      <PredictiveSimulator />
+
+      {/* ── 6. Multi-Agent Pipeline ────────────────────────────── */}
       <div>
-        <div style={{
-          padding: '12px 20px',
-          borderBottom: '1px solid #2E2E2E',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        }}>
-          <span style={{ fontSize: '11px', fontWeight: 500, color: '#fff' }}>
-            High-priority issues
-          </span>
-          <Link href="/issues" style={{
-            display: 'flex', alignItems: 'center', gap: '4px',
-            fontSize: '10px', color: '#E8621A', textDecoration: 'none',
-          }}>
-            View all <ArrowRight size={12} />
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2E2E2E]">
+          <span className="text-[11px] font-medium text-white">Multi-Agent Pipeline</span>
+          <Link href="/agents" className="flex items-center gap-1 text-[10px] text-[#E8621A] no-underline">
+            View all <ArrowRight size={11} />
+          </Link>
+        </div>
+
+        {/* Desktop: horizontal scrollable pipeline */}
+        <div className="hidden sm:flex items-center scroll-x px-5 py-4 gap-0">
+          <span className="text-[9px] text-[#555] tracking-widest uppercase mr-4 shrink-0">Active agents</span>
+          {AGENTS.map((agent, i) => (
+            <div key={i} className="flex items-center">
+              <div className="flex items-center gap-2 px-3 py-2 bg-[#1C1C1C] rounded shrink-0 border"
+                style={{ borderColor: agent.color + '33' }}>
+                <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold border shrink-0"
+                  style={{ background: agent.color + '20', borderColor: agent.color + '44', color: agent.color }}>
+                  {agent.num}
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#888] m-0 whitespace-nowrap">{agent.label}</p>
+                  <p className="text-[9px] text-[#555] m-0 whitespace-nowrap">{agent.desc}</p>
+                </div>
+                <div className="w-1.5 h-1.5 rounded-full ml-1 shrink-0" style={{ background: agent.color }} />
+              </div>
+              {i < AGENTS.length - 1 && (
+                <div className="flex items-center shrink-0">
+                  <div className="w-5 h-px bg-[#2E2E2E]" />
+                  <div className="border-t-4 border-b-4 border-l-[6px] border-t-transparent border-b-transparent"
+                    style={{ borderLeftColor: '#2E2E2E' }} />
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Mobile: vertical timeline */}
+        <div className="sm:hidden px-5 py-4 flex flex-col gap-0">
+          {AGENTS.map((agent, i) => (
+            <div key={i} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-bold border shrink-0"
+                  style={{ background: agent.color + '20', borderColor: agent.color + '44', color: agent.color }}>
+                  {agent.num}
+                </div>
+                {i < AGENTS.length - 1 && <div className="w-px flex-1 my-1 bg-[#2E2E2E]" />}
+              </div>
+              <div className="pb-4 pt-1 min-w-0">
+                <p className="text-xs font-medium text-white m-0">{agent.label}</p>
+                <p className="text-[10px] text-[#555] m-0 mt-0.5">{agent.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── 7. High-priority issues ────────────────────────────── */}
+      <div>
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2E2E2E]">
+          <span className="text-[11px] font-medium text-white">High-priority issues</span>
+          <Link href="/issues" className="flex items-center gap-1 text-[10px] text-[#E8621A] no-underline">
+            View all <ArrowRight size={11} />
           </Link>
         </div>
 
         {topIssues.length === 0 ? (
-          <div style={{ padding: '48px 20px', textAlign: 'center' }}>
-            <AlertTriangle size={28} style={{ color: '#2E2E2E', margin: '0 auto 12px', display: 'block' }} />
-            <p style={{ color: '#555', fontSize: '13px', margin: '0 0 16px' }}>No issues reported yet</p>
-            <Link href="/report" style={{
-              display: 'inline-flex', alignItems: 'center', gap: '6px',
-              background: '#E8621A', color: '#fff',
-              padding: '8px 18px', borderRadius: '6px',
-              fontSize: '12px', fontWeight: 500, textDecoration: 'none',
-            }}>
+          <div className="py-12 text-center">
+            <AlertTriangle size={28} className="text-[#2E2E2E] mx-auto mb-3" />
+            <p className="text-[#555] text-sm mb-4">No issues reported yet</p>
+            <Link href="/report" className="inline-flex items-center gap-1.5 bg-[#E8621A] text-white px-4 py-2 rounded-md text-xs font-medium no-underline">
               <Plus size={13} /> Report the first issue
             </Link>
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead>
-              <tr style={{ background: '#1C1C1C' }}>
-                {['Title', 'Category', 'Decay score', 'Status', 'Votes', 'Reported', ''].map((h, i) => (
-                  <th key={i} style={{
-                    padding: '8px 20px', textAlign: 'left',
-                    fontSize: '9px', color: '#555',
-                    letterSpacing: '1px', textTransform: 'uppercase',
-                    fontWeight: 500,
-                    borderBottom: '1px solid #2E2E2E',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {topIssues.map((issue) => (
-                <tr key={issue.id} style={{ borderBottom: '1px solid #1E1E1E' }}
-                  className="table-row-hover">
-                  <td style={{ padding: '12px 20px', maxWidth: '260px' }}>
-                    <span style={{ fontSize: '12px', fontWeight: 500, color: '#fff', display: 'block', marginBottom: '2px' }}>
-                      {issue.title}
-                    </span>
-                    <span style={{ fontSize: '10px', color: '#555', display: 'block' }}>
-                      {issue.ai_summary
-                        ? issue.ai_summary.slice(0, 60) + (issue.ai_summary.length > 60 ? '…' : '')
-                        : issue.suggested_authority}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <CategoryBadge category={issue.category} />
-                  </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <DecayBar score={issue.decay_score} />
-                  </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <StatusBadge status={issue.status} />
-                  </td>
-                  <td style={{ padding: '12px 20px', fontSize: '11px', color: '#888' }}>
-                    {issue.vote_count ?? 0}
-                  </td>
-                  <td style={{ padding: '12px 20px', fontSize: '10px', color: '#555', whiteSpace: 'nowrap' }}>
-                    {timeAgo(issue.created_at)}
-                  </td>
-                  <td style={{ padding: '12px 20px' }}>
-                    <Link href={`/issues/${issue.id}`} style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '4px',
-                      fontSize: '10px', color: '#E8621A', textDecoration: 'none',
-                    }}>
-                      View <ArrowRight size={11} />
-                    </Link>
-                  </td>
-                </tr>
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-[#1C1C1C]">
+                    {['Title', 'Category', 'Decay', 'Status', 'Votes', 'Reported', ''].map((h, i) => (
+                      <th key={i} className="px-5 py-2 text-left text-[9px] text-[#555] tracking-widest uppercase font-medium border-b border-[#2E2E2E] whitespace-nowrap">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {topIssues.map(issue => (
+                    <tr key={issue.id} className="border-b border-[#1E1E1E] hover:bg-[#1C1C1C] transition-colors">
+                      <td className="px-5 py-3 max-w-[260px]">
+                        <span className="text-xs font-medium text-white block mb-0.5 truncate">{issue.title}</span>
+                        <span className="text-[10px] text-[#555] block truncate">
+                          {issue.ai_summary ? issue.ai_summary.slice(0, 60) + (issue.ai_summary.length > 60 ? '…' : '') : issue.suggested_authority}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 whitespace-nowrap"><CategoryBadge category={issue.category} /></td>
+                      <td className="px-5 py-3"><DecayBar score={issue.decay_score} /></td>
+                      <td className="px-5 py-3 whitespace-nowrap"><StatusBadge status={issue.status} /></td>
+                      <td className="px-5 py-3 text-xs text-[#888]">{issue.vote_count ?? 0}</td>
+                      <td className="px-5 py-3 text-[10px] text-[#555] whitespace-nowrap">{timeAgo(issue.created_at)}</td>
+                      <td className="px-5 py-3">
+                        <Link href={`/issues/${issue.id}`} className="inline-flex items-center gap-1 text-[10px] text-[#E8621A] no-underline">
+                          View <ArrowRight size={11} />
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden flex flex-col divide-y divide-[#2E2E2E]">
+              {topIssues.map(issue => (
+                <Link key={issue.id} href={`/issues/${issue.id}`} className="flex items-start gap-3 p-4 no-underline hover:bg-[#1C1C1C] transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-white mb-1 truncate">{issue.title}</p>
+                    <div className="flex flex-wrap gap-1.5 mb-1">
+                      <CategoryBadge category={issue.category} />
+                      <StatusBadge status={issue.status} />
+                    </div>
+                    <span className="text-[10px] text-[#555]">{timeAgo(issue.created_at)} · {issue.vote_count ?? 0} votes</span>
+                  </div>
+                  <DecayBar score={issue.decay_score} />
+                </Link>
               ))}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </div>
 
-      {/* Agent pipeline strip */}
-      <div style={{
-        marginTop: '0',
-        borderTop: '1px solid #2E2E2E',
-        padding: '16px 20px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0',
-        overflowX: 'auto',
-      }}>
-        <span style={{ fontSize: '9px', color: '#555', letterSpacing: '1px', textTransform: 'uppercase', marginRight: '16px', whiteSpace: 'nowrap' }}>
-          Active agents
-        </span>
-        {[
-          { label: 'Vision Analyzer', color: '#E8621A', num: '1' },
-          { label: 'Duplicate Detector', color: '#8B5CF6', num: '2' },
-          { label: 'Decay & Risk', color: '#F5A623', num: '3' },
-          { label: 'Resolution Planner', color: '#2ECC71', num: '4' },
-          { label: 'RTI Escalation', color: '#E74C3C', num: '5' },
-        ].map((agent, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '7px',
-              padding: '6px 14px',
-              background: '#1C1C1C',
-              border: `1px solid ${agent.color}33`,
-              borderRadius: '4px',
-              whiteSpace: 'nowrap',
-            }}>
-              <div style={{
-                width: '18px', height: '18px',
-                borderRadius: '50%',
-                background: agent.color + '20',
-                border: `1px solid ${agent.color}44`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: '8px', fontWeight: 700, color: agent.color,
-              }}>
-                {agent.num}
-              </div>
-              <span style={{ fontSize: '10px', color: '#888' }}>{agent.label}</span>
-              <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: agent.color, marginLeft: '2px' }} />
-            </div>
-            {i < 4 && (
-              <div style={{ width: '20px', height: '1px', background: '#2E2E2E', flexShrink: 0 }} />
-            )}
+      {/* ── 8. Recent Activity Timeline ──────────────────────── */}
+      {recentActivity.length > 0 && (
+        <div>
+          <div className="px-5 py-3 border-b border-[#2E2E2E]">
+            <span className="text-[11px] font-medium text-white">Recent activity</span>
           </div>
-        ))}
-      </div>
+          <div className="px-5 py-4 flex flex-col gap-0">
+            {recentActivity.map((issue, i) => (
+              <div key={issue.id} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[#E8621A]" />
+                  {i < recentActivity.length - 1 && <div className="w-px flex-1 my-1 bg-[#2E2E2E]" />}
+                </div>
+                <div className="pb-3 min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <Link href={`/issues/${issue.id}`} className="text-xs text-white no-underline hover:text-[#E8621A] transition-colors truncate">
+                      {issue.title}
+                    </Link>
+                    <span className="text-[9px] text-[#555] shrink-0">{timeAgo(issue.created_at)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <StatusBadge status={issue.status} />
+                    <span className="text-[9px] text-[#555]">{issue.suggested_authority}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
   )
 }
 
 function DecayBar({ score }: { score: number | null }) {
-  if (score === null) return <span style={{ fontSize: '10px', color: '#555' }}>—</span>
+  if (score === null) return <span className="text-[10px] text-[#555]">—</span>
   const color = score >= 80 ? '#E74C3C' : score >= 60 ? '#F5A623' : '#2ECC71'
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <div style={{ width: '48px', height: '3px', background: '#2E2E2E', borderRadius: '2px' }}>
-        <div style={{ width: `${score}%`, height: '100%', background: color, borderRadius: '2px' }} />
+    <div className="flex items-center gap-2">
+      <div className="w-12 h-0.5 bg-[#2E2E2E] rounded-full overflow-hidden">
+        <div className="h-full rounded-full" style={{ background: color, width: `${score}%` }} />
       </div>
-      <span style={{ fontSize: '11px', fontWeight: 600, color }}>{score}</span>
+      <span className="text-[11px] font-semibold" style={{ color }}>{score}</span>
     </div>
   )
 }
