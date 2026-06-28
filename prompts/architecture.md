@@ -1,8 +1,27 @@
-The Dashboard Enhancement Phase does not appear in the UI. I still only see the Phase 3 dashboard. Please implement and integrate the following components into app/dashboard/page.tsx:
+I found the source of the runtime error.
 
-AIDailyBriefing
-AISeverityHeatmap
-AIAgentStatus
-ImpactSimulator
+File:
+`app/dashboard/page.tsx`
 
-Ensure they are imported and rendered on the Dashboard, not just created as standalone components. Verify they are visible in the browser before marking the task complete. Do not continue to another phase until these sections are fully integrated and working.
+Around line 269 there is:
+
+```tsx
+<div className="mt-2" onClick={e => e.preventDefault()}>
+```
+
+This is inside a Server Component, which is why Next.js throws:
+
+```
+Event handlers cannot be passed to Client Component props.
+```
+
+Please fix this correctly.
+
+Requirements:
+
+* Remove the `onClick` from `app/dashboard/page.tsx`.
+* If that interaction is actually needed, move that section into a dedicated Client Component with `"use client"`.
+* Do **not** convert the entire dashboard page into a Client Component.
+* If the `onClick` only exists to stop navigation or prevent default behavior, replace it with a non-JavaScript solution instead.
+* After fixing, verify that `npm run dev` loads `/dashboard` without any runtime errors.
+* Explain why the `onClick` was there and what you changed.

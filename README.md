@@ -80,6 +80,7 @@ NEXORA is purpose-built for Indian cities with city-aware authority routing, mon
 | Active agent pipeline strip | ✅ Live |
 | **Gemini Daily Briefing** — AI-generated civic briefing with confidence %, refresh | ✅ Live |
 | **AI Agent Status** — live panel showing all 6 agents, confidence, last run time | ✅ Live |
+| **AI Severity Heatmap** — 7-day × 6-category issue intensity grid | ✅ Live |
 | **Predictive Impact Simulator** — "What if ignored?" Gemini-powered scenario analysis | ✅ Live |
 | **Explainable Decay Score** — expandable weighted factor breakdown for every score | ✅ Live |
 

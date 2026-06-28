@@ -7,7 +7,7 @@ import AIDailyBriefing from '@/components/dashboard/AIDailyBriefing'
 import AIAgentStatus from '@/components/dashboard/AIAgentStatus'
 import AISeverityHeatmap from '@/components/dashboard/AISeverityHeatmap'
 import PredictiveSimulator from '@/components/dashboard/PredictiveSimulator'
-import ExplainableDecay from '@/components/dashboard/ExplainableDecay'
+import DecayCard from '@/components/dashboard/DecayCard'
 import {
   AlertTriangle, CheckCircle2, Zap,
   ArrowRight, Plus, Bot,
@@ -251,26 +251,15 @@ export default async function DashboardPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-[#2E2E2E]">
             {topDecay.map((issue, i) => {
               const score = issue.decay_score ?? 0
-              const color = score >= 80 ? '#E74C3C' : score >= 60 ? '#F5A623' : '#2ECC71'
-              const deg   = Math.round(score * 3.6)
               return (
-                <Link key={issue.id} href={`/issues/${issue.id}`} className="p-5 flex items-start gap-4 no-underline group hover:bg-[#1C1C1C] transition-colors">
-                  {/* Conic gauge */}
-                  <div className="shrink-0 w-14 h-14 rounded-full flex items-center justify-center"
-                    style={{ background: `conic-gradient(${color} ${deg}deg, #2E2E2E 0deg)` }}>
-                    <div className="w-10 h-10 rounded-full bg-[#141414] flex items-center justify-center">
-                      <span className="text-sm font-bold" style={{ color }}>{score}</span>
-                    </div>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-white mb-1 line-clamp-2 group-hover:text-[#E8621A] transition-colors">{issue.title}</p>
-                    <CategoryBadge category={issue.category} />
-                    <p className="text-[10px] text-[#555] mt-1">{timeAgo(issue.created_at)}</p>
-                    <div className="mt-2" onClick={e => e.preventDefault()}>
-                      <ExplainableDecay score={score} issueTitle={issue.title} />
-                    </div>
-                  </div>
-                </Link>
+                <DecayCard
+                  key={issue.id}
+                  id={issue.id}
+                  title={issue.title}
+                  category={issue.category}
+                  score={score}
+                  timeAgo={timeAgo(issue.created_at)}
+                />
               )
             })}
           </div>
