@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         lng: lng ?? 72.5714,
         image_url: image_url ?? '',
         ai_summary: ai_summary ?? '',
-        suggested_authority: suggested_authority ?? 'Ahmedabad Municipal Corporation',
+        suggested_authority: suggested_authority ?? 'Municipal Corporation',
         status: 'reported',
         decay_score: null,
         complaint_draft: null,

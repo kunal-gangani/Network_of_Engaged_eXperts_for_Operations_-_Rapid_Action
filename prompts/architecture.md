@@ -1,322 +1,231 @@
-You are the lead software architect for my hackathon project called **NEXORA (Network of Engaged eXperts for Operations And Rapid Action)**.
+# README Generation Task
 
-Your task is to **refactor and improve the project architecture** before implementing features.
+Analyze the **entire project** before writing anything.
 
-## Goal
+## Instructions
 
-Create a clean, scalable, enterprise-grade architecture suitable for a production-ready AI-powered civic issue resolution platform built for a Google AI hackathon.
+Read every folder and file in the project, including but not limited to:
 
-Do NOT implement business logic yet unless necessary. Focus on creating the project structure, reusable modules, placeholder files, exports, and clean organization.
+* app/
+* components/
+* agents/
+* services/
+* hooks/
+* utils/
+* config/
+* lib/
+* supabase/
+* types/
+* middleware/proxy
+* package.json
+* README.md (if it exists)
+* AGENTS.md
+* CLAUDE.md
+
+Infer the application's architecture, workflows, technologies, AI pipeline, and design decisions directly from the codebase.
+
+Do **not** assume features that are not implemented. Base the documentation on the actual project while clearly identifying planned or upcoming features where appropriate.
 
 ---
 
-## Tech Stack
+# Generate a production-quality README.md
 
-* Next.js 15 (App Router)
-* React
-* TypeScript
-* Tailwind CSS
+The README should be visually appealing, detailed, and suitable for:
+
+* GitHub
+* Hackathon submission
+* Recruiters
+* Open-source developers
+
+Use professional Markdown with badges, tables, emojis where appropriate, code blocks, and a clean structure.
+
+Include the following sections:
+
+## 1. Project Banner
+
+Project name:
+
+# NEXORA
+
+**Network of Engaged eXperts for Operations And Rapid Action**
+
+A one-line tagline that clearly explains the project.
+
+---
+
+## 2. Overview
+
+Explain:
+
+* What NEXORA is
+* The real-world problem it solves
+* Why it is different from traditional civic reporting systems
+
+---
+
+## 3. Features
+
+Categorize features such as:
+
+### AI Features
+
+* AI Vision
+* Issue Categorization
+* Duplicate Detection
+* Decay Score
+* Authority Finder
+* Resolution Planner
+* RTI Generator
+
+### Citizen Features
+
+### Dashboard
+
+### Analytics
+
+### Authentication
+
+### Reporting
+
+Only include features that exist or clearly mark future features as "Planned".
+
+---
+
+## 4. AI Agent Workflow
+
+Include a Mermaid flowchart like:
+
+```mermaid
+graph LR
+A[Citizen Reports Issue]
+--> B[Vision Agent]
+--> C[Duplicate Detection]
+--> D[Decay Score]
+--> E[Authority Finder]
+--> F[Resolution Planner]
+--> G[RTI Generator]
+```
+
+Explain each agent's responsibility.
+
+---
+
+## 5. Project Architecture
+
+Describe:
+
+* Frontend
+* Backend
+* API Routes
+* AI Layer
+* Database
+* Authentication
+
+Include another Mermaid architecture diagram.
+
+---
+
+## 6. Folder Structure
+
+Generate the current folder tree automatically from the project and explain the purpose of major folders.
+
+---
+
+## 7. Technology Stack
+
+Present in a table:
+
+| Category | Technology |
+
+Include frameworks, libraries, AI models, database, deployment tools, etc.
+
+---
+
+## 8. Screens
+
+List every implemented page and briefly describe its purpose.
+
+---
+
+## 9. Installation
+
+Provide complete setup instructions:
+
+* Clone
+* Install
+* Environment variables
+* Run locally
+* Build
+* Production
+
+---
+
+## 10. Environment Variables
+
+Document every required variable with descriptions.
+
+---
+
+## 11. API Routes
+
+Document each route with:
+
+* Method
+* Purpose
+* Request
+* Response
+
+---
+
+## 12. Database
+
+Explain the database schema (or planned schema if not fully implemented).
+
+---
+
+## 13. Future Roadmap
+
+Include realistic future enhancements.
+
+---
+
+## 14. Contributing
+
+Provide contribution guidelines.
+
+---
+
+## 15. License
+
+MIT License placeholder.
+
+---
+
+## 16. Credits
+
+Mention:
+
+* Google Gemini
 * Supabase
-* Google Gemini API
-* PostgreSQL
+* Next.js
+* Tailwind CSS
+
+and any other technologies actually used.
 
 ---
 
-## Project Theme
-
-NEXORA is an AI-powered civic issue resolution platform that enables citizens to report community problems while multiple AI agents collaborate to analyze, prioritize, route, and resolve issues.
-
-The UI follows:
-
-* Dark theme (#141414)
-* Orange accent (#E8621A)
-* Professional government/institution dashboard
-* Responsive design
-* Reusable components
-
----
-
-## Refactor Requirements
-
-### Rename
-
-Rename:
-
-component/
-
-to:
-
-components/
-
----
-
-### Create folders
-
-Create these folders if they do not exist:
-
-components/
-dashboard/
-issues/
-report/
-layout/
-common/
-hooks/
-services/
-utils/
-config/
-agents/
-
----
-
-### Dashboard Components
-
-Move dashboard UI into reusable components.
-
-Examples:
-
-* StatCard
-* PriorityIssueCard
-* ResolutionRate
-* AreaAssessment
-* DashboardCharts
-
----
-
-### Issue Components
-
-Create reusable components for issues.
-
-Examples:
-
-* IssueCard
-* IssueTimeline
-* DecayBar
-* IssueStatusBadge
-* IssueHeader
-
----
-
-### Report Components
-
-Create reusable report components.
-
-Examples:
-
-* UploadBox
-* AIAnalysis
-* LocationPicker
-* ReportStepper
-
----
-
-### Layout Components
-
-Move navigation components into:
-
-components/layout/
-
-Examples:
-
-Navbar
-
-Sidebar
-
-Topnav
-
-Footer
-
----
-
-### Common Components
-
-Create:
-
-Loader
-
-EmptyState
-
-ErrorCard
-
-Modal
-
-ConfirmDialog
-
----
-
-### Hooks
-
-Create:
-
-useIssues
-
-useGemini
-
-useDashboard
-
-useAuth
-
----
-
-### Services
-
-Move business logic into services.
-
-Create:
-
-issue.service.ts
-
-gemini.service.ts
-
-authority.service.ts
-
-decay.service.ts
-
-resolution.service.ts
-
-rti.service.ts
-
----
-
-### Utils
-
-Create:
-
-constants.ts
-
-helpers.ts
-
-date.ts
-
-colors.ts
-
-decayCalculator.ts
-
----
-
-### Config
-
-Create:
-
-theme.ts
-
-navigation.ts
-
-api.ts
-
-constants.ts
-
----
-
-### Types
-
-Split types into individual files instead of a single index.
-
-Examples:
-
-issue.ts
-
-user.ts
-
-authority.ts
-
-dashboard.ts
-
-gemini.ts
-
-api.ts
-
----
-
-## AI Agent Architecture
-
-This is extremely important.
-
-Create a dedicated agents module.
-
-agents/
-
-Inside it create:
-
-vision/
-
-duplicate/
-
-decay/
-
-authority/
-
-resolution/
-
-rti/
-
-Each agent should contain:
-
-index.ts
-
-service.ts
-
-prompt.ts
-
-types.ts
-
-Create:
-
-agents/orchestrator.ts
-
-The orchestrator should coordinate all agents in the following order:
-
-1. Vision Agent
-2. Duplicate Detection Agent
-3. Decay Scoring Agent
-4. Authority Finder Agent
-5. Resolution Planning Agent
-6. RTI Generator Agent
-
-Each agent should expose a clean interface but contain placeholder implementations for now.
-
----
-
-## API
-
-Ensure the API routes align with the services and agent architecture.
-
-Use route handlers only for request validation and orchestration.
-
-Business logic belongs inside services or agents.
-
----
-
-## App Router
-
-Keep App Router clean.
-
-Pages should mostly assemble reusable components.
-
-Avoid large page files.
-
----
-
-## Code Standards
-
-* Strict TypeScript
-* Modular architecture
-* Reusable components
-* Server/client separation where appropriate
-* No duplicated logic
-* Proper barrel exports where useful
-* Clear folder naming
-* Production-quality code
-* Placeholder implementations where functionality is not yet built
-
----
-
-## Deliverables
-
-1. Refactor the project structure.
-2. Move files into appropriate folders.
-3. Create placeholder files where required.
-4. Update imports automatically.
-5. Explain every architectural decision after the refactor.
-6. Do not delete existing work unless replacing it with a better structure.
-
-Treat this as the foundation for a large-scale production application while keeping it practical for a hackathon.
+# Quality Requirements
+
+* Professional GitHub README
+* Well-formatted Markdown
+* Clear headings
+* Tables
+* Mermaid diagrams
+* Code snippets
+* Installation instructions
+* Feature tables
+* Architecture diagrams
+* Modern badges at the top
+* Catchy and memorable wording
+
+Finally, overwrite the existing README.md with the new version and ensure it accurately reflects the current state of the project.

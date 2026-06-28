@@ -84,7 +84,7 @@ export default function ReportPage() {
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState<IssueCategory>('other')
   const [severity, setSeverity] = useState(3)
-  const [authority, setAuthority] = useState('Ahmedabad Municipal Corporation')
+  const [authority, setAuthority] = useState('Municipal Corporation')
 
   // ── Location state ───────────────────────────────────────
   const [lat, setLat] = useState<number | null>(null)
@@ -218,7 +218,18 @@ export default function ReportPage() {
     setLocating(true)
     setLocError('')
     navigator.geolocation.getCurrentPosition(
-      pos => { setLat(pos.coords.latitude); setLng(pos.coords.longitude); setLocating(false) },
+      async pos => {
+        const { latitude: la, longitude: ln } = pos.coords
+        setLat(la)
+        setLng(ln)
+        // Auto-fill authority from real location
+        try {
+          const res = await fetch(`/api/location?lat=${la}&lng=${ln}`)
+          const loc = await res.json()
+          if (loc.authority) setAuthority(loc.authority)
+        } catch { }
+        setLocating(false)
+      },
       () => { setLocError('Could not get location. Please enable location access.'); setLocating(false) }
     )
   }

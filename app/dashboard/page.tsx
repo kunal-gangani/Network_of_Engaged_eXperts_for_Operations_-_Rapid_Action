@@ -74,7 +74,7 @@ export default async function DashboardPage() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
           <div style={{ width: '24px', height: '1px', background: '#E8621A' }} />
           <span style={{ fontSize: '10px', color: '#E8621A', letterSpacing: '2px', fontWeight: 500 }}>
-            AHMEDABAD · LIVE OVERVIEW
+            LIVE CIVIC OVERVIEW
           </span>
         </div>
         <h1 style={{

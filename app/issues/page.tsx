@@ -132,8 +132,6 @@ export default async function IssuesPage({
               const rtiTriggered = daysOld >= 14 && issue.status !== 'resolved'
               return (
                 <tr key={issue.id} style={{ borderBottom: '1px solid #1C1C1C', transition: 'background .1s' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#1C1C1C')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <td style={{ padding: '12px 20px', maxWidth: '280px' }}>
                     <span style={{ fontSize: '12px', fontWeight: 500, color: '#fff', display: 'block', marginBottom: '2px' }}>
