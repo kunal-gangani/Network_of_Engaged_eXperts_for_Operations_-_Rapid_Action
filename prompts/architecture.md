@@ -1,27 +1,10 @@
-I found the source of the runtime error.
+npm run build is failing because IssueCard.tsx imports @/utils/date, but utils/date.ts does not exist.
 
-File:
-`app/dashboard/page.tsx`
+Please search the project for all imports from @/utils/date.
 
-Around line 269 there is:
+Either:
 
-```tsx
-<div className="mt-2" onClick={e => e.preventDefault()}>
-```
+recreate utils/date.ts with the required utility functions (including timeAgo), or
+replace the import with the correct existing utility.
 
-This is inside a Server Component, which is why Next.js throws:
-
-```
-Event handlers cannot be passed to Client Component props.
-```
-
-Please fix this correctly.
-
-Requirements:
-
-* Remove the `onClick` from `app/dashboard/page.tsx`.
-* If that interaction is actually needed, move that section into a dedicated Client Component with `"use client"`.
-* Do **not** convert the entire dashboard page into a Client Component.
-* If the `onClick` only exists to stop navigation or prevent default behavior, replace it with a non-JavaScript solution instead.
-* After fixing, verify that `npm run dev` loads `/dashboard` without any runtime errors.
-* Explain why the `onClick` was there and what you changed.
+After fixing, run npm run build again and continue fixing any remaining TypeScript errors until the build succeeds.

@@ -1,5 +1,2 @@
 export { default as IssueCard } from './IssueCard'
 export { CategoryBadge, StatusBadge, DecayBadge, SeverityBar, SeverityDots } from './IssueBadges'
-export { default as IssueTimeline } from './IssueTimeline'
-export { default as IssueStatusBadge } from './IssueStatusBadge'
-export { default as IssueHeader } from './IssueHeader'
