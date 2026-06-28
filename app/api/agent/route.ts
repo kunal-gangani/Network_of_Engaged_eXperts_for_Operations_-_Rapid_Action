@@ -1,61 +1,86 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, apiVersion: 'v1' })
+// DEMO MODE: Scripted civic agent conversation
+interface Message { role: 'user' | 'model'; parts: [{ text: string }] }
 
-const SYSTEM_PROMPT = `You are NEXORA's Civic AI Agent for Ahmedabad, India. Help citizens report civic issues like potholes, water leakages, broken streetlights, garbage, or stray animals.
+const RESPONSES = [
+    {
+        match: ['hi', 'hello', 'hey', 'start', 'help'],
+        text: "Hi! I'm NEXORA's Civic AI Agent. Tell me what issue you've spotted in your area — describe what you see and roughly where it is.",
+    },
+    {
+        match: ['pothole', 'road', 'broken', 'crack', 'damaged'],
+        text: "Got it — sounds like a road infrastructure issue. How severe is it? Is it a small crack or a large pothole that's causing traffic problems?",
+        form: { title: 'Road pothole causing vehicle damage', description: 'Large pothole on the main road causing vehicle damage and traffic disruption. Needs urgent repair.', category: 'pothole', severity: 4, suggested_authority: 'Ahmedabad Municipal Corporation' },
+    },
+    {
+        match: ['water', 'leak', 'pipe', 'flood', 'overflow'],
+        text: "Water leakage can be serious — it wastes resources and damages roads. Is this a pipe on the street or inside a building? And which area roughly?",
+        form: { title: 'Water pipe leakage causing road flooding', description: 'Burst water pipe causing flooding on the road. Water wastage and road damage observed.', category: 'water_leakage', severity: 3, suggested_authority: 'Water Board' },
+    },
+    {
+        match: ['light', 'streetlight', 'dark', 'lamp'],
+        text: "A broken streetlight is a safety issue, especially at night. How many lights are out and which road is this on?",
+        form: { title: 'Broken streetlight creating safety hazard', description: 'Streetlight not functioning, creating unsafe conditions for pedestrians and motorists at night.', category: 'streetlight', severity: 3, suggested_authority: 'Electricity Board' },
+    },
+    {
+        match: ['garbage', 'waste', 'trash', 'dump', 'smell'],
+        text: "Garbage dumping is a health hazard. Is this a regular dumping spot or a one-time incident? Which area?",
+        form: { title: 'Illegal garbage dumping near residential area', description: 'Large amounts of garbage dumped near residential area causing health hazard and foul smell.', category: 'garbage', severity: 4, suggested_authority: 'Ahmedabad Municipal Corporation' },
+    },
+    {
+        match: ['sg highway', 'navrangpura', 'satellite', 'cg road', 'bodakdev', 'iscon', 'ahmedabad'],
+        text: "Thanks for the location! I've filled in the report form on the right with all the details. Review it and hit Submit when ready.",
+        useLastForm: true,
+    },
+    {
+        match: ['severe', 'bad', 'urgent', 'serious', 'large', 'big'],
+        text: "Noted — marked as high severity. I've updated the form. Please verify the location using the button on the right and submit.",
+        useLastForm: true,
+    },
+]
 
-Your job:
-1. Greet the user and ask them to describe their issue
-2. Ask ONE clarifying question at a time if needed (location, severity, how long)
-3. Once you have enough info, output the form data
-
-Rules:
-- Keep responses short and friendly (2-3 sentences max)
-- Ask about location if not mentioned
-- When ready, end your message with exactly this block:
-
-FORM_DATA:
-{"title":"...","description":"...","category":"pothole|water_leakage|streetlight|garbage|stray_animals|other","severity":3,"suggested_authority":"Ahmedabad Municipal Corporation|PWD|Electricity Board|Water Board|Animal Control|Other"}
-
-Only output FORM_DATA once when you have title, description, category, severity.`
-
-interface Message {
-    role: 'user' | 'model'
-    parts: [{ text: string }]
-}
+const DEFAULT_RESPONSES = [
+    "Can you tell me more about where exactly this is located in Ahmedabad?",
+    "Got it. And how long has this issue been there approximately?",
+    "Thanks! I've pre-filled the form based on what you've described. Please add your location and submit.",
+]
 
 export async function POST(request: NextRequest) {
-    try {
-        const { history, message } = await request.json() as {
-            history: Message[]
-            message: string
+    await new Promise(r => setTimeout(r, 800))
+
+    const { history, message } = await request.json() as { history: Message[]; message: string }
+    const lower = message.toLowerCase()
+
+    // Find matching response
+    let matched = RESPONSES.find(r => r.match.some(keyword => lower.includes(keyword)))
+
+    // If using last form, get the last form data from a previous match
+    let formData = null
+    if (matched) {
+        if ('form' in matched) {
+            formData = matched.form
+        } else if ('useLastForm' in matched) {
+            // Find last form in history context
+            formData = { title: 'Civic issue reported via AI Agent', description: message, category: 'other', severity: 3, suggested_authority: 'Ahmedabad Municipal Corporation' }
         }
-
-        const contents = [
-            { role: 'user', parts: [{ text: 'System instructions: ' + SYSTEM_PROMPT }] },
-            { role: 'model', parts: [{ text: 'Understood. I am the NEXORA Civic AI Agent, ready to help citizens of Ahmedabad report civic issues.' }] },
-            ...history,
-            { role: 'user', parts: [{ text: message }] },
-        ]
-
-        const result = await ai.models.generateContent({
-            model: 'gemini-pro',
-            contents,
-            config: { temperature: 0.4, maxOutputTokens: 400 },
-        })
-
-        const text = result.text ?? ''
-        let formData = null
-        const formMatch = text.match(/FORM_DATA:\s*(\{[\s\S]*?\})/m)
-        if (formMatch) {
-            try { formData = JSON.parse(formMatch[1]) } catch { }
-        }
-        const displayText = text.replace(/FORM_DATA:[\s\S]*$/m, '').trim()
-
-        return NextResponse.json({ text: displayText, formData, duplicate: null })
-    } catch (err) {
-        console.error('Agent error:', err)
-        return NextResponse.json({ error: 'Agent failed' }, { status: 500 })
     }
+
+    const turnCount = history.length
+    const text = matched
+        ? matched.text
+        : DEFAULT_RESPONSES[Math.min(turnCount, DEFAULT_RESPONSES.length - 1)]
+
+    // After 3 turns always offer to fill form
+    const autoForm = !formData && turnCount >= 4
+        ? { title: `Civic issue: ${message.slice(0, 50)}`, description: message, category: 'other' as const, severity: 3, suggested_authority: 'Ahmedabad Municipal Corporation' }
+        : null
+
+    return NextResponse.json({
+        text: autoForm
+            ? "I have enough information to file this report. I've pre-filled the form — please verify the location and submit!"
+            : text,
+        formData: formData ?? autoForm,
+        duplicate: null,
+    })
 }

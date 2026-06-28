@@ -225,19 +225,26 @@ export default function ReportPage() {
 
   // ── Submit ────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!imageFile || !lat || !lng || !title) return
+    if (!lat || !lng || !title) return
     setSubmitting(true)
     setSubmitError('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
 
-      const ext = imageFile.name.split('.').pop()
-      const path = `${user.id}/${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage.from('issue-photos').upload(path, imageFile)
-      if (upErr) throw upErr
-
-      const { data: { publicUrl } } = supabase.storage.from('issue-photos').getPublicUrl(path)
+      // Try to upload photo, fall back to placeholder if storage not configured
+      let publicUrl = ''
+      if (imageFile) {
+        try {
+          const ext = imageFile.name.split('.').pop()
+          const path = `${user.id}/${Date.now()}.${ext}`
+          const { error: upErr } = await supabase.storage.from('issue-photos').upload(path, imageFile)
+          if (!upErr) {
+            const { data: urlData } = supabase.storage.from('issue-photos').getPublicUrl(path)
+            publicUrl = urlData.publicUrl
+          }
+        } catch { }
+      }
 
       const res = await fetch('/api/issues', {
         method: 'POST',
@@ -249,15 +256,22 @@ export default function ReportPage() {
           suggested_authority: authority,
         }),
       })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? 'Failed to submit')
+      }
+
       const issue = await res.json()
+      if (!issue.id) throw new Error('No issue ID returned')
       router.push(`/issues/${issue.id}`)
-    } catch {
-      setSubmitError('Something went wrong. Please try again.')
+    } catch (e: any) {
+      setSubmitError(e?.message ?? 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }
 
-  const canSubmit = !!imageFile && !!lat && !!lng && !!title
+  const canSubmit = !!lat && !!lng && !!title
 
   return (
     <div>

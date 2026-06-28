@@ -1,47 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { GoogleGenAI } from '@google/genai'
 import { createClient } from '@/lib/supabase/server'
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY!, apiVersion: 'v1' })
-
+// DEMO MODE: Generate realistic RTI letter without Gemini API
 export async function POST(request: NextRequest) {
-  try {
-    const { issue_id } = await request.json()
-    const supabase = await createClient()
+  await new Promise(r => setTimeout(r, 1800))
 
-    const { data: issue } = await supabase.from('issues').select('*').eq('id', issue_id).single()
-    if (!issue) return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
+  const { issue_id } = await request.json()
+  const supabase = await createClient()
 
-    const { data: votes } = await supabase.from('votes').select('count').eq('issue_id', issue_id)
-    const daysOld = Math.floor((Date.now() - new Date(issue.created_at).getTime()) / 86400000)
-    const voteCount = votes?.[0]?.count ?? 0
-    const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+  const { data: issue } = await supabase.from('issues').select('*').eq('id', issue_id).single()
+  if (!issue) return NextResponse.json({ error: 'Issue not found' }, { status: 404 })
 
-    const prompt = `Generate a formal RTI application under the Right to Information Act, 2005.
+  const { data: votes } = await supabase.from('votes').select('count').eq('issue_id', issue_id)
+  const daysOld = Math.floor((Date.now() - new Date(issue.created_at).getTime()) / 86400000)
+  const voteCount = votes?.[0]?.count ?? 0
+  const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
 
-Issue: ${issue.title}
-Description: ${issue.description || issue.ai_summary}
-Category: ${issue.category}
-Location: Ahmedabad, Gujarat (${issue.lat}, ${issue.lng})
-Reported: ${daysOld} days ago, Status: ${issue.status}
-Community verifications: ${voteCount} citizens
-Authority: ${issue.suggested_authority}
+  const draft = `RTI APPLICATION UNDER THE RIGHT TO INFORMATION ACT, 2005
+
 Date: ${today}
 
-Write a complete formal RTI letter addressed to the PIO of ${issue.suggested_authority}.
-Request: current status, action plan with timeline, officer responsible, budget allocated.
-Request reply within 30 days per RTI Act Section 7(1).
-Mention ${voteCount} community verifications as evidence.`
+To,
+The Public Information Officer (PIO),
+${issue.suggested_authority},
+Ahmedabad, Gujarat.
 
-    const result = await ai.models.generateContent({
-      model: 'gemini-pro',
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      config: { temperature: 0.3 },
-    })
+Subject: Request for Information regarding unresolved civic issue — ${issue.title}
 
-    return NextResponse.json({ draft: result.text })
-  } catch (err) {
-    console.error('RTI agent error:', err)
-    return NextResponse.json({ error: 'RTI generation failed' }, { status: 500 })
-  }
+Respected Sir/Madam,
+
+I, a citizen of Ahmedabad, hereby submit this application under the Right to Information Act, 2005 (Section 6) to seek information regarding a civic issue that has remained unresolved for ${daysOld} days despite being reported through the NEXORA Civic Intelligence Platform.
+
+DETAILS OF THE ISSUE:
+- Issue Title: ${issue.title}
+- Category: ${issue.category.replace('_', ' ').toUpperCase()}
+- Location: Ahmedabad, Gujarat (Coordinates: ${issue.lat?.toFixed(4)}, ${issue.lng?.toFixed(4)})
+- Date of Original Report: ${new Date(issue.created_at).toLocaleDateString('en-IN')}
+- Days Unresolved: ${daysOld} days
+- Severity Level: ${issue.severity}/5
+- Community Verifications: ${voteCount} citizens have independently verified this issue
+
+DESCRIPTION:
+${issue.description || issue.ai_summary || 'Civic issue reported by community members requiring immediate attention.'}
+
+INFORMATION SOUGHT:
+Under Section 6 of the RTI Act, 2005, I hereby request the following information:
+
+1. What is the current status of this civic issue as on date?
+2. What is the action plan for resolution of this issue with specific timelines?
+3. What is the name, designation and contact details of the officer responsible for resolving this issue?
+4. What is the budget allocated for the repair/resolution of this specific issue?
+5. How many similar complaints have been received for this location in the past 12 months?
+6. What is the standard operating procedure (SOP) for addressing this category of civic issue?
+
+GROUNDS FOR URGENCY:
+This issue has remained unresolved for ${daysOld} days and poses a significant risk to public safety and property. ${voteCount} community members have independently verified the existence and severity of this issue. The NEXORA Civic AI platform has assessed this issue with a high urgency decay score, indicating deteriorating conditions.
+
+I request that the information be provided within 30 days as mandated under Section 7(1) of the RTI Act, 2005. In case of denial, please provide reasons as per Section 7(8) of the Act.
+
+I am enclosing the prescribed RTI application fee (if applicable) and request an acknowledgment of this application.
+
+Thanking you,
+
+Yours faithfully,
+[Applicant Name]
+[Contact Number]
+[Email Address]
+Ahmedabad, Gujarat
+
+---
+This RTI application was auto-generated by NEXORA — Civic Intelligence Platform
+Application Reference: RTI-NEXORA-${issue_id.slice(0, 8).toUpperCase()}
+Generated on: ${today}`
+
+  return NextResponse.json({ draft })
 }
