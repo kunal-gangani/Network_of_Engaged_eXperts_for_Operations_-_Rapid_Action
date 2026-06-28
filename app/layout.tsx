@@ -17,9 +17,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   return (
     <html lang="en">
-      <body style={{ minHeight: '100vh', background: '#141414' }}>
+      <body className="min-h-screen bg-[#141414] text-white">
         <Topnav user={user} />
-        <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 24px 40px' }}>
+        <main className="max-w-[1400px] mx-auto px-4 sm:px-6 pb-10 sm:pb-16">
           {children}
         </main>
       </body>
